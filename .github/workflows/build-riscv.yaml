@@ -1,0 +1,59 @@
+name: Build RISC-V
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-riscv:
+    name: Build cloudflared for RISC-V
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整历史以便 git describe 正常工作
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build for RISC-V 64-bit
+      env:
+        GOOS: linux
+        GOARCH: riscv64
+        CGO_ENABLED: 0
+      run: |
+        make cloudflared
+    
+    - name: Rename binary
+      run: |
+        mv cloudflared cloudflared-linux-riscv64
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloudflared-linux-riscv64
+        path: cloudflared-linux-riscv64
+        retention-days: 30
+    
+    - name: Create release package
+      run: |
+        VERSION=$(git describe --tags --always --match "[0-9][0-9][0-9][0-9].*.*")
+        tar -czf cloudflared-linux-riscv64-${VERSION}.tar.gz cloudflared-linux-riscv64
+        sha256sum cloudflared-linux-riscv64-${VERSION}.tar.gz > cloudflared-linux-riscv64-${VERSION}.tar.gz.sha256
+    
+    - name: Upload release package
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloudflared-linux-riscv64-package
+        path: |
+          cloudflared-linux-riscv64-*.tar.gz
+          cloudflared-linux-riscv64-*.sha256
+        retention-days: 30
